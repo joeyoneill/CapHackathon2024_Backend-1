@@ -5,7 +5,7 @@ import os
 from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_openai import ChatOpenAI
+from langchain_openai import ChatOpenAI, AzureChatOpenAI
 import logging
 
 # Load Environment Variables
@@ -35,10 +35,10 @@ async def websocket_endpoint(websocket: WebSocket):
                 await websocket.send_text('<<E:NO_QUERY>>')
             
             # Initialize the LLM
-            llm = ChatOpenAI(
-                model="gpt-3.5-turbo-0125",
-                temperature=0.7,
-                api_key=os.environ.get("private_OPENAI_API_KEY")
+            llm = AzureChatOpenAI(
+                openai_api_version=os.environ["AZURE_OPENAI_API_VERSION"],
+                azure_deployment=os.environ["AZURE_OPENAI_CHAT_DEPLOYMENT_NAME"],
+                temperature=0.7
             )
             
             # Stream the response
