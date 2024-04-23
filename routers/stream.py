@@ -42,11 +42,12 @@ async def websocket_endpoint(websocket: WebSocket):
             )
             
             # Stream the response
-            # TODO: Save QUERY & Response
             resp = ''
             for token in llm.stream(str(data['query'])):
                 await websocket.send_text(token.content)
                 resp += token.content
+                
+            # TODO: Save QUERY & Response
             
             # Send Successful Completion response to the Frontend
             await websocket.send_text('<<END>>')

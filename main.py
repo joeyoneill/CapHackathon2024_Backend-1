@@ -5,6 +5,7 @@ from fastapi.responses import RedirectResponse
 
 # In-App Dependencies
 from routers.stream import router as stream_router
+from routers.auth import router as auth_router
 
 
 ###############################################################################
@@ -17,6 +18,7 @@ app = FastAPI()
 # Routes
 ###############################################################################
 app.include_router(stream_router)
+app.include_router(auth_router)
 
 
 ###############################################################################
