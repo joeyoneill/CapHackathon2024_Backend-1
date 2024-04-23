@@ -3,18 +3,12 @@ from fastapi import APIRouter, status, Depends
 from azure.cosmos import CosmosClient
 import os
 from dotenv import load_dotenv
-import logging
-import jwt
-from datetime import datetime, timedelta
 
+# In-App Dependencies
 from dependencies import create_access_token, jwt_dependency
 
 # Load Environment Variables
 load_dotenv('.env')
-
-# Configure the root logger to log all messages
-#logging.basicConfig(level=logging.INFO)
-
 
 ###############################################################################
 # Initialize Router
