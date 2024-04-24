@@ -1,5 +1,6 @@
 # Imports
 from fastapi import APIRouter, status, Depends
+from pydantic import BaseModel
 from azure.cosmos import CosmosClient
 import os
 from dotenv import load_dotenv
@@ -18,9 +19,14 @@ router = APIRouter()
 ###############################################################################
 # Endpoints
 ###############################################################################
+# Register Request Body Class
+class RegisterRequest(BaseModel):
+    email: str
+    password_hash: str
+
 # Adds User to Database
 @router.post("/auth/register", tags=["Authentication"])
-def register(email: str, password_hash: str):
+def register(request: RegisterRequest):
     try:
         # Get Cosmos Client
         client = CosmosClient.from_connection_string(conn_str=os.environ['COSMOS_CONNECTION_STRING'])
@@ -34,8 +40,8 @@ def register(email: str, password_hash: str):
         # Check if Unique
         try:
             user = container.read_item(
-                item=f'id-{email}',
-                partition_key=email
+                item=f'id-{request.email}',
+                partition_key=request.email
             )
             return {
                 'status': status.HTTP_400_BAD_REQUEST,
@@ -46,9 +52,9 @@ def register(email: str, password_hash: str):
         
         # Create User
         container.upsert_item(body={
-            'id': f'id-{email}',
-            'UserId': email,
-            'password': password_hash
+            'id': f'id-{request.email}',
+            'UserId': request.email,
+            'password': request.password_hash
         })
         
         # return Success
@@ -64,9 +70,14 @@ def register(email: str, password_hash: str):
             'detail': f'User Creation Failed. Error: {e}'
         }
 
+# Login Request Body Class
+class LoginRequest(BaseModel):
+    email: str
+    password_hash: str
+
 # Checks if User is Valid
 @router.post("/auth/login", tags=["Authentication"])
-def login(email: str, password_hash: str):
+def login(request: LoginRequest):
     try:
         # Get Cosmos Client
         client = CosmosClient.from_connection_string(conn_str=os.environ['COSMOS_CONNECTION_STRING'])
@@ -79,15 +90,15 @@ def login(email: str, password_hash: str):
         
         # Find User
         user = container.read_item(
-            item=f'id-{email}',
-            partition_key=email
+            item=f'id-{request.email}',
+            partition_key=request.email
         )
         
         # Check Password
-        if user['password'] == password_hash:
+        if user['password'] == request.password_hash:
             
             # Create JWT Access Token
-            jwt_token = create_access_token(60, {'sub': email})
+            jwt_token = create_access_token(60, {'sub': request.email})
             
             # Return Successful Login
             return {
