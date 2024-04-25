@@ -6,7 +6,7 @@ import os
 from dotenv import load_dotenv
 
 # In-App Dependencies
-from dependencies import create_access_token, jwt_dependency
+from dependencies import create_access_token, jwt_dependency, create_user_blob_container_and_index
 
 # Load Environment Variables
 load_dotenv('.env')
@@ -57,17 +57,37 @@ def register(request: RegisterRequest):
             'password': request.password_hash
         })
         
-        # return Success
-        return {
-            'status': status.HTTP_201_CREATED,
-            'detail': 'User Created Successfully!'
-        }
+        # Create User Blob Container
+        if create_user_blob_container_and_index(request.email):
+            # return Success
+            return {
+                'status': status.HTTP_201_CREATED,
+                'detail': 'User Created Successfully!'
+            }
+        else:
+            # delete user
+            try:
+                container.delete_item(
+                    item=f'id-{request.email}',
+                    partition_key=request.email
+                )
+            except Exception as e:
+                return {
+                    'status': status.HTTP_400_BAD_REQUEST,
+                    'detail': f'User Creation + Deletion Failed. Error: {e}'
+                }
+            
+            # return Failure
+            return {
+                'status': status.HTTP_400_BAD_REQUEST,
+                'detail': f'User Creation Failed 1. Error: {e}'
+            }
     
     except Exception as e:
         # return Failure
         return {
             'status': status.HTTP_400_BAD_REQUEST,
-            'detail': f'User Creation Failed. Error: {e}'
+            'detail': f'User Creation Failed 2. Error: {e}'
         }
 
 # Login Request Body Class
