@@ -80,7 +80,7 @@ def jwt_dependency(authorization: str = Header(...)):
         payload = decode_and_validate_token(token)
         
         # Return the 'sub' value from the payload
-        return payload.get('sub')
+        return str(payload.get('sub')).lower()
     
     except Exception as e:
         raise HTTPException(
@@ -165,8 +165,10 @@ def create_user_search_index(unique_id: str):
         return False
     
 
-# Creates a User's Azure Blob Container
+# Creates a User's Azure Blob Container & AI Search Index
 def create_user_blob_container_and_index(user_email: str):
+    # save to lower
+    user_email = user_email.lower()
     
     # To check if container was created or not
     container_created = False

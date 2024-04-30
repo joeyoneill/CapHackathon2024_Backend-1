@@ -9,14 +9,13 @@ from langchain_openai import ChatOpenAI, AzureChatOpenAI
 import logging
 
 # In-App Dependencies
-from dependencies import jwt_dependency
+from dependencies import jwt_dependency, get_user_container_or_index_name
 from routers.chat_history import save_msg_to_cosmos
+from routers.ai_search import search_vector_index
+from routers.chat_history import get_chat_history_by_id
 
 # Load Environment Variables
 load_dotenv('.env')
-
-# Configure the root logger to log all messages
-logging.basicConfig(level=logging.DEBUG)
 
 ###############################################################################
 # Initialize Router
@@ -63,7 +62,7 @@ async def websocket_endpoint(websocket: WebSocket):
             # Ensure the JWT is valid
             try:
                 user_email = jwt_dependency(authorization=data['jwt'])
-                if not user_email or user_email != data['email']:
+                if not user_email or user_email.lower() != data['email'].lower():
                     await websocket.send_text('<<E:INVALID_JWT>>')
                     break
             except Exception as e:
@@ -77,11 +76,39 @@ async def websocket_endpoint(websocket: WebSocket):
                 temperature=0.7
             )
             
+            # TODO: Get Chat History using data["chatId"]
+            chat_history_list = get_chat_history_by_id(
+                chat_id=data["chatId"],
+                user_email=user_email.lower()
+            )
+            chat_history_str = ''
+            for obj in chat_history_list:
+                chat_history_str += f'Human: {obj.get("human")}\nai: {obj.get("ai")}\n'
+            
+            # Get Container/Index name
+            index_name = get_user_container_or_index_name(user_email.lower())
+            
+            # Get Context from AI Search
+            similar_docs = search_vector_index(
+                query=data['query'],
+                index_name=index_name
+            )
+            
+            # Create Context String
+            context_str = ''
+            for doc in similar_docs:
+                context_str += f'File name: {str(doc.metadata["file_name"])}\nContent:\n```{doc.page_content}```\n'
+            
+            # CREATE PROMPT FOR LLM STREAM
+            prompt = f'You are "Capgemin.AI", a helpful, friendly chatbot. You are here to help the user with any questions they may have. You are knowledgeable and can provide information on a wide range of topics. You are patient and understanding. You are here to help the user and make their experience as positive as possible. Use the chat history and context to help answer questions, if applicable - but do not rely soley on them. Do not mention anything about the context to the user, just use the information it provides if it is relevant to answering the query.\n====\nContext:\n====\n{context_str}\n====\nChat History:\n====\n{chat_history_str}\n====\nCurrent Human Query:\n{str(data["query"])}\n====\nai: '
+            
+            # print(prompt)
+            
             # Message Complete
             premature_disconnect = False
             
             # Stream the response
-            for token in llm.stream(str(data['query'])):
+            for token in llm.stream(prompt):
                 await websocket.send_text(token.content)
                 resp += token.content
             

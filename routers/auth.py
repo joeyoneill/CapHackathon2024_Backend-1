@@ -27,6 +27,7 @@ class RegisterRequest(BaseModel):
 # Adds User to Database
 @router.post("/auth/register", tags=["Authentication"])
 def register(request: RegisterRequest):
+    email = str(request.email).lower()
     try:
         # Get Cosmos Client
         client = CosmosClient.from_connection_string(conn_str=os.environ['COSMOS_CONNECTION_STRING'])
@@ -40,8 +41,8 @@ def register(request: RegisterRequest):
         # Check if Unique
         try:
             user = container.read_item(
-                item=f'id-{request.email}',
-                partition_key=request.email
+                item=f'id-{email}',
+                partition_key=email
             )
             return {
                 'status': status.HTTP_400_BAD_REQUEST,
@@ -52,13 +53,13 @@ def register(request: RegisterRequest):
         
         # Create User
         container.upsert_item(body={
-            'id': f'id-{request.email}',
-            'UserId': request.email,
+            'id': f'id-{email}',
+            'UserId': email,
             'password': request.password_hash
         })
         
         # Create User Blob Container
-        if create_user_blob_container_and_index(request.email):
+        if create_user_blob_container_and_index(email):
             # return Success
             return {
                 'status': status.HTTP_201_CREATED,
@@ -68,8 +69,8 @@ def register(request: RegisterRequest):
             # delete user
             try:
                 container.delete_item(
-                    item=f'id-{request.email}',
-                    partition_key=request.email
+                    item=f'id-{email}',
+                    partition_key=email
                 )
             except Exception as e:
                 return {
@@ -98,6 +99,7 @@ class LoginRequest(BaseModel):
 # Checks if User is Valid
 @router.post("/auth/login", tags=["Authentication"])
 def login(request: LoginRequest):
+    email = str(request.email).lower()
     try:
         # Get Cosmos Client
         client = CosmosClient.from_connection_string(conn_str=os.environ['COSMOS_CONNECTION_STRING'])
@@ -110,15 +112,15 @@ def login(request: LoginRequest):
         
         # Find User
         user = container.read_item(
-            item=f'id-{request.email}',
-            partition_key=request.email
+            item=f'id-{email}',
+            partition_key=email
         )
         
         # Check Password
         if user['password'] == request.password_hash:
             
             # Create JWT Access Token
-            jwt_token = create_access_token(60, {'sub': request.email})
+            jwt_token = create_access_token(60, {'sub': email})
             
             # Return Successful Login
             return {
