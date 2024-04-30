@@ -12,9 +12,6 @@ from dependencies import jwt_dependency
 # Load Environment Variables
 load_dotenv('.env')
 
-# Configure the root logger to log all messages
-logging.basicConfig(level=logging.DEBUG)
-
 ###############################################################################
 # Initialize Router
 ###############################################################################
@@ -23,6 +20,7 @@ router = APIRouter()
 ###############################################################################
 # Helper Functions
 ###############################################################################
+# Saves Message to Cosmos Conversation Document
 def save_msg_to_cosmos(chat_id: str, user_email: str, user_query: str,  ai_response: str):
     try:
         # Get Cosmos Client
@@ -68,6 +66,30 @@ def save_msg_to_cosmos(chat_id: str, user_email: str, user_query: str,  ai_respo
     except Exception as e:
         logging.error(f"Error Saving Chat for <{user_email}> to Cosmos: {e}")
 
+# Returns Chat History for stream prompt
+def get_chat_history_by_id(chat_id: str, user_email: str, n: int = 5):
+    
+    # Ensure email is lower case
+    user_email = user_email.lower()
+    
+    # Try and Get Chat History
+    try:
+        # Get Cosmos Container Client
+        client = CosmosClient.from_connection_string(conn_str=os.environ['COSMOS_CONNECTION_STRING'])
+        database = client.get_database_client(os.environ['COSMOS_DB_NAME'])
+        container = database.get_container_client(os.environ['COSMOS_CHAT_CONTAINER_NAME'])
+        
+        # Get Chat History Object
+        chat_history = container.read_item(
+            item=chat_id,
+            partition_key=user_email
+        )
+        
+        # Return Chat History
+        return chat_history.get("history")[-n:]
+        
+    except Exception as e:
+        return None
 ###############################################################################
 # Endpoints
 ###############################################################################
