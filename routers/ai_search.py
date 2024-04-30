@@ -5,9 +5,7 @@ from dotenv import load_dotenv
 import os
 from langchain_community.vectorstores.azuresearch import AzureSearch
 from langchain_openai import AzureOpenAIEmbeddings
-from langchain_text_splitters import CharacterTextSplitter, RecursiveCharacterTextSplitter
-from langchain.docstore.document import Document as Lang_Document
-import textract
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from docx import Document
 from io import BytesIO
 from PyPDF2 import PdfReader
