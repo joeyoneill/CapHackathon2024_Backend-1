@@ -76,14 +76,15 @@ async def websocket_endpoint(websocket: WebSocket):
                 temperature=0.7
             )
             
-            # TODO: Get Chat History using data["chatId"]
+            # Get Chat History using data["chatId"]
             chat_history_list = get_chat_history_by_id(
                 chat_id=data["chatId"],
                 user_email=user_email.lower()
             )
             chat_history_str = ''
-            for obj in chat_history_list:
-                chat_history_str += f'Human: {obj.get("human")}\nai: {obj.get("ai")}\n'
+            if chat_history_list:
+                for obj in chat_history_list:
+                    chat_history_str += f'Human: {obj.get("human")}\nai: {obj.get("ai")}\n'
             
             # Get Container/Index name
             index_name = get_user_container_or_index_name(user_email.lower())
@@ -96,8 +97,9 @@ async def websocket_endpoint(websocket: WebSocket):
             
             # Create Context String
             context_str = ''
-            for doc in similar_docs:
-                context_str += f'File name: {str(doc.metadata["file_name"])}\nContent:\n```{doc.page_content}```\n'
+            if similar_docs:
+                for doc in similar_docs:
+                    context_str += f'File name: {str(doc.metadata["file_name"])}\nContent:\n```{doc.page_content}```\n'
             
             # CREATE PROMPT FOR LLM STREAM
             prompt = f'You are "Capgemin.AI", a helpful, friendly chatbot. You are here to help the user with any questions they may have. You are knowledgeable and can provide information on a wide range of topics. You are patient and understanding. You are here to help the user and make their experience as positive as possible. Use the chat history and context to help answer questions, if applicable - but do not rely soley on them. Do not mention anything about the context to the user, just use the information it provides if it is relevant to answering the query.\n====\nContext:\n====\n{context_str}\n====\nChat History:\n====\n{chat_history_str}\n====\nCurrent Human Query:\n{str(data["query"])}\n====\nai: '
