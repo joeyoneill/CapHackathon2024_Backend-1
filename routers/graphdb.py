@@ -136,6 +136,7 @@ def delete_document_node(user_email: str, file_name: str, container_name: str):
 #
 ###############################################################################
 
+# TODO: ADD THE CREATE DOC FUNCTION TO FILE UPLOAD ROUTE
 # TODO: DELETE -> FOR MAIN RUN TESTING ONLY
 @router.get('/graphdb_test', tags=['General'])
 def graphdb_test():
