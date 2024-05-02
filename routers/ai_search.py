@@ -13,6 +13,13 @@ from PyPDF2 import PdfReader
 
 # In-App Dependencies
 from dependencies import get_user_uuid, jwt_dependency
+from routers.graphdb import (
+    create_document_node,
+    delete_document_node,
+    create_content_node,
+    generate_entities_from_llm,
+    create_entity_node
+)
 
 # Load Environment Variables
 load_dotenv('.env')
@@ -57,7 +64,8 @@ def extract_text_from_txt(file_data):
     return file_data.decode('utf-8')  # Assuming UTF-8 encoded text file
 
 # Chunks and Embeds Text from Files and uploads to vector index store
-def save_text_to_vector_index(text: str, file_name: str, index_name: str):
+# Stores chunks in Content Nodes and generates entities
+def save_text_to_vector_index_and_content_nodes(text: str, file_name: str, index_name: str, user_email: str):
     
     # Use AzureOpenAIEmbeddings with an Azure account
     embeddings: AzureOpenAIEmbeddings = AzureOpenAIEmbeddings(
@@ -92,8 +100,31 @@ def save_text_to_vector_index(text: str, file_name: str, index_name: str):
         "container": index_name,
         "file_name": file_name,
     }
-    for doc in docs:
+    for i, doc in enumerate(docs, start=1):
+        # Update Document Metadata
         doc.metadata = updated_metadata.copy()
+        
+        # Create Content Nodes
+        create_content_node(
+            user_email = user_email,
+            file_name = file_name,
+            container_name = index_name,
+            content = doc.page_content.strip(),
+            chunk = i
+        )
+        
+        # Get entity list
+        entity_list = generate_entities_from_llm(doc.page_content.strip())
+        
+        # Create Entity Nodes
+        for entity in entity_list:
+            create_entity_node(
+                user_email = user_email,
+                file_name = file_name,
+                container_name = index_name,
+                chunk = i,
+                entity = str(entity)
+            )
     
     # Embed & Store Docs in Vector Store
     vector_store.add_documents(documents=docs)
@@ -165,12 +196,32 @@ async def upload_files(
         elif extension == '.pdf':
             file_text = extract_text_from_pdf(file_data)
         
-        # Save Text to Vector Index
-        txt_saved_to_index = save_text_to_vector_index(
-            text = file_text,
+        # Create Neo4j Document Node
+        doc_node_created = create_document_node(
+            user_email = user_email,
             file_name = file.filename,
-            index_name = user_continer_name
+            container_name = user_continer_name
         )
+        
+        # Check if Document Node was Created
+        if doc_node_created:
+            try:
+                # Save Text to Vector Index
+                txt_saved_to_index = save_text_to_vector_index_and_content_nodes(
+                    text = file_text,
+                    file_name = file.filename,
+                    index_name = user_continer_name,
+                    user_email = user_email
+                )
+            except:
+                delete_document_node(
+                    user_email = user_email,
+                    file_name = file.filename,
+                    container_name = user_continer_name
+                )
+                raise HTTPException(status_code=500, detail='Failed to save text to vector index.')
+        else:
+            raise HTTPException(status_code=500, detail='Failed to create document node in graph database.')
         
         # Check if text was saved to index
         if txt_saved_to_index:
@@ -181,6 +232,12 @@ async def upload_files(
             except Exception as e:
                 raise HTTPException(status_code=500, detail=str(e))
         else:
+            if doc_node_created:
+                delete_document_node(
+                    user_email = user_email,
+                    file_name = file.filename,
+                    container_name = user_continer_name
+                )
             raise HTTPException(status_code=500, detail='Failed to save text to vector index.')
     
     # Return Success

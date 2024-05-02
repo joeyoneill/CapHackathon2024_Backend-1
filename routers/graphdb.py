@@ -231,7 +231,7 @@ def generate_entities_from_llm(content: str):
     )
     
     # Create the Prompt
-    prompt = f"The text you return to me will be DIRECTLY used in python code. PLEASE ONLY RETURN A COMMA SEPERATED STRING of all themes, schemas, characters, figures, events, etc. THAT ARE CONTAINED in the following content. INCLUDE ANYTHING THAT SEEMS IMPORTANT. THESE ITEMS WILL BE USED DIRECTLY IN A KNOWLEDGE GRAPH as ENTITY nodes to EXPLAIN the content:\n```\n{content}\n```"
+    prompt = f"The text you return to me will be DIRECTLY used in python code. PLEASE ONLY RETURN A COMMA SEPERATED STRING of themes, schemas, characters, figures, events, etc. THAT ARE CONTAINED in the following content. PLEASE ONLY CREATE 3-5 ITEMS IN THE LIST. INCLUDE THE ONLY THE ITEMS THAT SEEMS IMPORTANT. THESE ITEMS WILL BE USED DIRECTLY IN A KNOWLEDGE GRAPH as ENTITY nodes to EXPLAIN the content:\n```\n{content}\n```"
     
     # Call the LLM for response
     response = llm.invoke([prompt])
