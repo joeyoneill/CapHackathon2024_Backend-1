@@ -2,10 +2,7 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from dotenv import load_dotenv
 import os
-from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
-from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_openai import ChatOpenAI, AzureChatOpenAI
+from langchain_openai import AzureChatOpenAI
 import logging
 
 # In-App Dependencies
