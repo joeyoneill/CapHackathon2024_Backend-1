@@ -232,7 +232,7 @@ def create_user_blob_container_and_index(user_email: str):
 ###############################################################################
 # Return's the Container/Search Index Name for a user
 # Container Names and Search Index Names are the same
-def get_user_container_or_index_name(user_email: str):
+def get_user_uuid(user_email: str):
     # Get Cosmos Container
     client = CosmosClient.from_connection_string(conn_str=os.environ['COSMOS_CONNECTION_STRING'])
     database = client.get_database_client(os.environ['COSMOS_DB_NAME'])

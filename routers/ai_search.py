@@ -12,7 +12,7 @@ from PyPDF2 import PdfReader
 
 
 # In-App Dependencies
-from dependencies import get_user_container_or_index_name, jwt_dependency
+from dependencies import get_user_uuid, jwt_dependency
 
 # Load Environment Variables
 load_dotenv('.env')
@@ -139,7 +139,7 @@ async def upload_files(
     blob_service_client = BlobServiceClient.from_connection_string(os.getenv('AZURE_BLOB_CONN_STR'))
     
     # Get Container Name
-    user_continer_name = get_user_container_or_index_name(user_email)
+    user_continer_name = get_user_uuid(user_email)
     
     # Connect to Container Client
     container_client = blob_service_client.get_container_client(user_continer_name)

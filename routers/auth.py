@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 
 # In-App Dependencies
 from dependencies import create_access_token, jwt_dependency, create_user_blob_container_and_index
+from routers.graphdb import create_user_node
 
 # Load Environment Variables
 load_dotenv('.env')
@@ -60,6 +61,11 @@ def register(request: RegisterRequest):
         
         # Create User Blob Container
         if create_user_blob_container_and_index(email):
+            
+            # TODO: CHECK IF THIS FAILS
+            # Create User Node in GraphDB
+            create_user_node(email)
+            
             # return Success
             return {
                 'status': status.HTTP_201_CREATED,

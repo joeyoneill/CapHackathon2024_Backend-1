@@ -9,7 +9,7 @@ from langchain_openai import ChatOpenAI, AzureChatOpenAI
 import logging
 
 # In-App Dependencies
-from dependencies import jwt_dependency, get_user_container_or_index_name
+from dependencies import jwt_dependency, get_user_uuid
 from routers.chat_history import save_msg_to_cosmos
 from routers.ai_search import search_vector_index
 from routers.chat_history import get_chat_history_by_id
@@ -87,7 +87,7 @@ async def websocket_endpoint(websocket: WebSocket):
                     chat_history_str += f'Human: {obj.get("human")}\nai: {obj.get("ai")}\n'
             
             # Get Container/Index name
-            index_name = get_user_container_or_index_name(user_email.lower())
+            index_name = get_user_uuid(user_email.lower())
             
             # Get Context from AI Search
             similar_docs = search_vector_index(
