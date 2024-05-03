@@ -21,11 +21,11 @@ celery = Celery(
     # backend= os.environ['REDIS_URL']
 )
 
+###############################################################################
 # Tasks
-@celery.task
-def example_task(x, y):
-    return x + y
+###############################################################################
 
+# Task to process documents into Neo4j
 @celery.task
 def process_documents_into_neo4j(text: str, user_email: str, file_name: str, container_name: str):
     
