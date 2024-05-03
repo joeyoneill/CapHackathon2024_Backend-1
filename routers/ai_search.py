@@ -223,3 +223,22 @@ async def upload_files(
     # Return Success
     return {'status_code': status.HTTP_200_OK, 'detail': 'Files Uploaded Successfully'}
 
+
+@router.get('/get_all_documents', tags=['General'])
+def get_all_documents(
+    user_email: str = Depends(jwt_dependency)
+):
+    # Azure Blob Storage Connection Client
+    blob_service_client = BlobServiceClient.from_connection_string(os.getenv('AZURE_BLOB_CONN_STR'))
+    
+    # Get Container Name
+    user_continer_name = get_user_uuid(user_email)
+    
+    # Connect to Container Client
+    container_client = blob_service_client.get_container_client(user_continer_name)
+    
+    # Get Blob List
+    blob_list = container_client.list_blobs()
+    
+    # Return List of Blobs
+    return [blob.name for blob in blob_list]
