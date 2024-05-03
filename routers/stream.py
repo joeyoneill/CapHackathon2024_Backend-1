@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 import os
 from langchain_openai import AzureChatOpenAI
 import logging
+import json
 
 # In-App Dependencies
 from dependencies import jwt_dependency, get_user_uuid
@@ -109,7 +110,19 @@ async def websocket_endpoint(websocket: WebSocket):
             # Stream the response
             for token in llm.stream(prompt):
                 await websocket.send_text(token.content)
-                resp += token.content
+                resp += token.content 
+            
+            # Send JSON Data flag
+            await websocket.send_text('<<JSON>>')
+            
+            # Create JSON Data
+            json_data = {
+                'ai_response': resp,
+                'user_query': data['query']
+            }
+            
+            # Send JSON data as a string
+            await websocket.send_text(json.dumps(json_data))
             
             # Send Successful Completion response to the Frontend
             await websocket.send_text('<<END>>')
