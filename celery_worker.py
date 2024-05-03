@@ -15,18 +15,18 @@ logger = get_task_logger(__name__)
 load_dotenv('.env')
 
 # Create Celery App
-app = Celery(
+celery = Celery(
     'worker',
     broker = os.environ['REDIS_URL'],
     # backend= os.environ['REDIS_URL']
 )
 
 # Tasks
-@app.task
+@celery.task
 def example_task(x, y):
     return x + y
 
-@app.task
+@celery.task
 def process_documents_into_neo4j(text: str, user_email: str, file_name: str, container_name: str):
     
     try:
