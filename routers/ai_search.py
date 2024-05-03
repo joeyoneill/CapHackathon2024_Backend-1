@@ -13,13 +13,8 @@ from PyPDF2 import PdfReader
 
 # In-App Dependencies
 from dependencies import get_user_uuid, jwt_dependency
-from routers.graphdb import (
-    create_document_node,
-    delete_document_node,
-    create_content_node,
-    generate_entities_from_llm,
-    create_entity_node
-)
+from routers.graphdb import create_document_node, delete_document_node
+from celery_worker import process_documents_into_neo4j
 
 # Load Environment Variables
 load_dotenv('.env')
@@ -65,7 +60,7 @@ def extract_text_from_txt(file_data):
 
 # Chunks and Embeds Text from Files and uploads to vector index store
 # Stores chunks in Content Nodes and generates entities
-def save_text_to_vector_index_and_content_nodes(text: str, file_name: str, index_name: str, user_email: str):
+def save_text_to_vector_index(text: str, file_name: str, index_name: str):
     
     # Use AzureOpenAIEmbeddings with an Azure account
     embeddings: AzureOpenAIEmbeddings = AzureOpenAIEmbeddings(
@@ -100,31 +95,9 @@ def save_text_to_vector_index_and_content_nodes(text: str, file_name: str, index
         "container": index_name,
         "file_name": file_name,
     }
-    for i, doc in enumerate(docs, start=1):
+    for doc in docs:
         # Update Document Metadata
         doc.metadata = updated_metadata.copy()
-        
-        # Create Content Nodes
-        create_content_node(
-            user_email = user_email,
-            file_name = file_name,
-            container_name = index_name,
-            content = doc.page_content.strip(),
-            chunk = i
-        )
-        
-        # Get entity list
-        entity_list = generate_entities_from_llm(doc.page_content.strip())
-        
-        # Create Entity Nodes
-        for entity in entity_list:
-            create_entity_node(
-                user_email = user_email,
-                file_name = file_name,
-                container_name = index_name,
-                chunk = i,
-                entity = str(entity)
-            )
     
     # Embed & Store Docs in Vector Store
     vector_store.add_documents(documents=docs)
@@ -207,11 +180,10 @@ async def upload_files(
         if doc_node_created:
             try:
                 # Save Text to Vector Index
-                txt_saved_to_index = save_text_to_vector_index_and_content_nodes(
+                txt_saved_to_index = save_text_to_vector_index(
                     text = file_text,
                     file_name = file.filename,
-                    index_name = user_continer_name,
-                    user_email = user_email
+                    index_name = user_continer_name
                 )
             except:
                 delete_document_node(
@@ -239,7 +211,15 @@ async def upload_files(
                     container_name = user_continer_name
                 )
             raise HTTPException(status_code=500, detail='Failed to save text to vector index.')
-    
+
+        # Run Celery Task to Process Document
+        process_documents_into_neo4j.delay(
+            text = file_text,
+            user_email = user_email,
+            file_name = file.filename,
+            container_name = user_continer_name
+        )
+        
     # Return Success
     return {'status_code': status.HTTP_200_OK, 'detail': 'Files Uploaded Successfully'}
 

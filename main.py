@@ -46,3 +46,9 @@ app.add_middleware(
 @app.get("/", tags=["General"])
 def root_route():
     return RedirectResponse(url="/docs")
+
+from celery_worker import example_task
+@app.post("/celery_test", tags=["General"])
+async def celery_test():
+    example_task.delay()
+    return {"message": "Celery task started!"}
