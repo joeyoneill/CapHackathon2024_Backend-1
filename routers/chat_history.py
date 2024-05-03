@@ -96,7 +96,10 @@ def get_chat_history_by_id(chat_id: str, user_email: str, n: int = 5):
 
 # Returns a user's chat history
 @router.get("/all_chat_history", tags=["Chat History"])
-def get_all_chat_history(email: str = Depends(jwt_dependency)):
+def get_all_chat_history(
+    #email: str = Depends(jwt_dependency)
+):
+    email = 'test@test.com'
     try:
         # Get Cosmos Client
         client = CosmosClient.from_connection_string(conn_str=os.environ['COSMOS_CONNECTION_STRING'])
@@ -113,10 +116,24 @@ def get_all_chat_history(email: str = Depends(jwt_dependency)):
             enable_cross_partition_query=True
         )
         
+        # Convert to List
+        chat_history = list(chat_history)
+        
+        # Update Chat History
+        for obj in chat_history:
+            history_dict = {
+                'human': [],
+                'ai': []
+            }
+            for chat in obj['history']:
+                history_dict['human'].append(chat['human'])
+                history_dict['ai'].append(chat['ai'])
+            obj['history'] = history_dict
+        
         # Return Chat History
         return {
             'status': 200,
-            'chat_history': list(chat_history)
+            'chat_history': chat_history
         }
     
     except Exception as e:
