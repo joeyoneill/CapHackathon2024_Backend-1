@@ -44,6 +44,18 @@ uvicorn main:app --reload
 
 2. Open your web browser and go to 'http://localhost:8000' to access API documentation (Swagger UI).
 
+## PUSHING TO AZURE CONTAINER CMDs
+
+1. Pushing FastAPI to container
+```
+az acr build --resource-group ODL-OpenAI-Copilot-1306957-OpenAI --registry columbiateam1registry --file .\Dockerfile --image backend:latest .
+```
+
+2. Pushing Celery Worker to container
+```
+az acr build --resource-group ODL-OpenAI-Copilot-1306957-OpenAI --registry columbiateam1registry --file .\Dockerfile.celery --image celeryworker:latest .
+```
+
 ## Contributing
 If you'd like to contribute to this project, please follow these steps:
 1. Create a new branch.
