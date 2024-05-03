@@ -1,9 +1,11 @@
 # Imports
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Depends
 from langchain_openai import AzureChatOpenAI
 from neo4j import GraphDatabase
 from dotenv import load_dotenv
 import os
+
+from pydantic import BaseModel
 
 # In-App Dependencies
 from dependencies import jwt_dependency, get_user_uuid
@@ -150,7 +152,7 @@ def create_content_node(user_email: str, file_name: str, container_name: str, co
             def add_content(tx):
                 query = (
                     "MATCH (u:User {email: $email})-[:OWNS]->(d:Document {name: $name, container: $container})"
-                    "CREATE (c:Content {data: $content, chunk: $chunk}) "
+                    "CREATE (c:Content {chunk: $chunk, data: $content}) "
                     "CREATE (d)-[:CONTAINS]->(c)"
                 )
                 tx.run(
@@ -158,7 +160,8 @@ def create_content_node(user_email: str, file_name: str, container_name: str, co
                     email=user_email,
                     name=file_name,
                     container=container_name,
-                    chunk=chunk
+                    chunk=chunk,
+                    content=content
                 )
             
             # Execute Transaction with Session
@@ -170,8 +173,8 @@ def create_content_node(user_email: str, file_name: str, container_name: str, co
         return True
     
     # Failure
-    except:
-        print(f"CONTENT node <'{user_email} -> {file_name} -> {chunk}'> creation failed.")
+    except Exception as e:
+        print(f"CONTENT node <'{user_email} -> {file_name} -> {chunk}'> creation failed.  Exception: {e}")
         return False
 
 ###############################################################################
@@ -231,7 +234,7 @@ def generate_entities_from_llm(content: str):
     )
     
     # Create the Prompt
-    prompt = f"The text you return to me will be DIRECTLY used in python code. PLEASE ONLY RETURN A COMMA SEPERATED STRING of themes, schemas, characters, figures, events, etc. THAT ARE CONTAINED in the following content. PLEASE ONLY CREATE 2-5 ITEMS IN THE LIST. INCLUDE THE ONLY THE ITEMS THAT SEEMS IMPORTANT. THESE ITEMS WILL BE USED DIRECTLY IN A KNOWLEDGE GRAPH as ENTITY nodes to EXPLAIN the content:\n```\n{content}\n```"
+    prompt = f"The text you return to me will be DIRECTLY used in python code. PLEASE ONLY RETURN A COMMA SEPARATED STRING of themes, schemas, characters, figures, events, etc. THAT ARE CONTAINED in the following content. Please ONLY generate me between two and five entities in the comma separated string. Make sure the entities are the MOST important items based on the content. THESE ITEMS WILL BE USED DIRECTLY IN A KNOWLEDGE GRAPH as ENTITY nodes to EXPLAIN the content:\n```\n{content}\n```"
     
     # Call the LLM for response
     response = llm.invoke([prompt])
@@ -247,96 +250,40 @@ def generate_entities_from_llm(content: str):
 ###############################################################################
 # Endpoints
 ###############################################################################
-# TODO: ADD THE CREATE DOC & CREATE CONTENT FUNCTION TO FILE UPLOAD ROUTE
-# TODO: DELETE -> FOR MAIN RUN TESTING ONLY
-@router.get('/graphdb_display_test', tags=['GraphDB'])
-def graphdb_display_test(user_email: str):
-    # ensure it is lowercase
-    user_email = user_email.lower()
-    
-    # Connect to DB Driver
-    with GraphDatabase.driver(os.environ['NEO4J_URI'], auth=neo4j_auth) as driver:
+# Request Object for document graph
+class DocumentGraphRequest(BaseModel):
+    file_name: str
+
+# Returns Document Node and its descendants for frontend display
+@router.post("/document_graph", tags=["GraphDB"])
+def document_graph(request: DocumentGraphRequest, user_email: str = Depends(jwt_dependency)):
+    try:
+        # Connect to DB Driver
+        with GraphDatabase.driver(os.environ['NEO4J_URI'], auth=neo4j_auth) as driver:
+            with driver.session() as session:
+                query = (
+                    "MATCH (user:User {email: $email})-[:OWNS]->(d:Document {name: $file_name})"
+                    "MATCH path = (d)-[*]->(descendant)"
+                    "RETURN nodes(path) AS Nodes, relationships(path) AS Relationships"
+                )
+                result = session.run(query, email=user_email, file_name=request.file_name)
+                nodes = []
+                links = []
+                seen_nodes = set()
+                
+                for record in result:
+                    for node in record["Nodes"]:
+                        if node.id not in seen_nodes:
+                            nodes.append({"id": node.id, **node._properties})
+                            seen_nodes.add(node.id)
+                    for rel in record["Relationships"]:
+                        links.append({"source": rel.start_node.id, "target": rel.end_node.id})
+
+                return {"nodes": nodes, "links": links}
         
-        # def get_nodes(tx):
-        #     query = (
-        #         "MATCH (u:User {email: $email})-[:OWNS]->(d:Document)"
-        #         "OPTIONAL MATCH (d)-[*]->(c)"
-        #         "RETURN d as document, collect(c) as children"
-        #     )
-        #     tx.run(query, email=user_email)
-        
-        # with driver.session() as session:
-        #     result = session.read_transaction(get_nodes)
-        #     return [{"document": record["document"]._properties, "children": [node._properties for node in record["children"]]} for record in result]
-        
-        with driver.session() as session:
-            result = session.run("""
-                MATCH (u:User {email: $email})-[:OWNS]->(d:Document)
-                OPTIONAL MATCH (d)-[*]->(c)
-                RETURN d as document, collect(c) as children
-                """,
-                email=user_email
-            )
-            return [
-                {
-                    "document": record["document"]._properties,
-                    "children": [node._properties for node in record["children"]]
-                } for record in result
-            ]
-
-
-@router.get('/graphdb_test', tags=['GraphDB'])
-def graphdb_test(user_email: str):
-    
-    content = """President Biden's State of the Union Address
-(The President presents his prepared remarks to Speaker Johnson.) Your bedtime reading.
-
-Tony! Thank you. Looking for Jill.
-
-Good evening. Good evening. If I were smart, I'd go home now.
-
-Mr. Speaker, Madam Vice President, members of Congress, my fellow Americans.
-
-In January 1941, Franklin Roosevelt came to this chamber to speak to the nation. And he said, “I address you at a moment unprecedented in the history of the Union”. Hitler was on the march. War was raging in Europe.
-
-President Roosevelt's purpose was to wake up Congress and alert the American people that this was no ordinary time. Freedom and democracy were under assault in the world.
-
-Tonight, I come to the same chamber to address the nation. Now it's we who face an unprecedented moment in the history of the Union.
-
-And, yes, my purpose tonight is to wake up the Congress and alert the American people that this is no ordinary moment either. Not since President Lincoln and the Civil War have freedom and democracy been under assault at home as they are today.
-
-What makes our moment rare is that freedom and democracy are under attack at — both at home and overseas at the very same time.
-
-Overseas, Putin of Russia is on the march, invading Ukraine and sowing chaos throughout Europe and beyond.
-
-If anybody in this room thinks Putin will stop at Ukraine, I assure you: He will not.
-
-But Ukraine — Ukraine can stop Putin. Ukraine can stop Putin if we stand with Ukraine and provide the weapons that it needs to defend itself.
-
-That is all — that is all Ukraine is asking. They're not asking for American soldiers. In fact, there are no American soldiers at war in Ukraine, and I'm determined to keep it that way.
-
-But now assistance to Ukraine is being blocked by those who want to walk away from our world leadership.
-
-It wasn't long ago when a Republican president named Ronald Reagan thundered, “Mr. Gorbachev, tear down this wall.”
-
-Now — now my predecessor, a former Republican president, tells Putin, quote, “Do whatever the hell you want.”
-
-That's a quote.
-
-A former president actually said that — bowing down to a Russian leader. I think it's outrageous, it's dangerous, and it's unacceptable.
-
-America is a founding member of NATO, the military alliance of democratic nations created after World War Two prevent — to prevent war and keep the peace.
-
-And today, we've made NATO stronger than ever. We welcomed Finland to the Alliance last year. And just this morning, Sweden officially joined, and their minister is here tonight. Stand up. Welcome. Welcome, welcome, welcome. And they know how to fight.
-
-Mr. Prime Minister, welcome to NATO, the strongest military alliance the world has ever seen.
-
-I say this to Congress: We have to stand up to Putin. Send me a bipartisan national security bill. History is literally watching. History is watching.
-
-If the United States walks away, it will put Ukraine
-at risk. Europe is at risk. The free world will be at risk, emboldening others to do what they wish to do us harm.
-
-My message to President Putin, who I've known for a long time, is simple: We will not walk away. We will not bow down. I will not bow down.
-"""
-    
-    return generate_entities_from_llm(content)
+    except Exception as e:
+        print(f"Failed to retrieve document graph: {e}")
+        return {
+            'status': status.HTTP_500_INTERNAL_SERVER_ERROR,
+            'detail': f"Failed to retrieve document graph: {e}"
+        }
