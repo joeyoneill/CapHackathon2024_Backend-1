@@ -97,9 +97,8 @@ def get_chat_history_by_id(chat_id: str, user_email: str, n: int = 5):
 # Returns a user's chat history
 @router.get("/all_chat_history", tags=["Chat History"])
 def get_all_chat_history(
-    #email: str = Depends(jwt_dependency)
+    email: str = Depends(jwt_dependency)
 ):  
-    email = 'test@test.com'
     try:
         # Get Cosmos Client
         client = CosmosClient.from_connection_string(conn_str=os.environ['COSMOS_CONNECTION_STRING'])
